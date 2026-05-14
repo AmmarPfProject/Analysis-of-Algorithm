@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pattern Matching Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #090e1a;
+    --surface:  #111827;
+    --surface2: #1a2236;
+    --border:   #1e2d45;
+    --naive:    #3b82f6;
+    --kmp:      #06b6d4;
+    --rk:       #10b981;
+    --bm:       #f59e0b;
+    --match:    #a78bfa;
+    --mismatch: #f87171;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --accent:   #06b6d4;
+    --glow: 0 0 20px rgba(6,182,212,0.25);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── BG GRID ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(6,182,212,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(6,182,212,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative; z-index: 10;
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 20px;
+    background: linear-gradient(180deg, rgba(9,14,26,0.95) 0%, transparent 100%);
+  }
+  .logo {
+    width: 44px; height: 44px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: grid; place-items: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 18px; font-weight: 700; color: var(--bg);
+    flex-shrink: 0;
+    box-shadow: var(--glow);
+  }
+  header h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  .header-tags { display: flex; gap: 8px; margin-left: auto; }
+  .tag {
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+    border: 1px solid;
+  }
+  .tag-naive { border-color: var(--naive); color: var(--naive); }
+  .tag-kmp   { border-color: var(--kmp);   color: var(--kmp); }
+  .tag-rk    { border-color: var(--rk);    color: var(--rk); }
+  .tag-bm    { border-color: var(--bm);    color: var(--bm); }
+
+  /* ── LAYOUT ── */
+  .app { position: relative; z-index: 1; display: grid; grid-template-columns: 360px 1fr; min-height: calc(100vh - 85px); }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 28px 24px;
+    display: flex; flex-direction: column; gap: 24px;
+    background: rgba(17,24,39,0.6);
+    backdrop-filter: blur(10px);
+  }
+
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  textarea, input[type=text] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    padding: 12px 14px;
+    resize: vertical;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  textarea:focus, input[type=text]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(6,182,212,0.12);
+  }
+  textarea { min-height: 110px; }
+
+  .preset-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .preset-btn {
+    padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--muted); cursor: pointer; transition: all .15s;
+    font-family: 'Syne', sans-serif;
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .algo-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .algo-toggle {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 12px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    cursor: pointer; transition: all .15s;
+    user-select: none;
+  }
+  .algo-toggle.active { background: var(--surface); }
+  .algo-toggle input { display: none; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .algo-toggle span { font-size: 12px; font-weight: 700; }
+
+  .run-btn {
+    width: 100%; padding: 14px;
+    background: var(--accent); color: var(--bg);
+    border: none; border-radius: 10px;
+    font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800;
+    letter-spacing: 1px; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: var(--glow);
+    text-transform: uppercase;
+  }
+  .run-btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(6,182,212,0.4); }
+  .run-btn:active { transform: translateY(0); }
+
+  /* ── MAIN ── */
+  .main { padding: 28px 32px; display: flex; flex-direction: column; gap: 28px; overflow-y: auto; }
+
+  /* ── VISUALIZER ── */
+  .viz-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .viz-card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .algo-badge {
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 800; letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .viz-body { padding: 20px; }
+
+  /* text visualization strips */
+  .text-strip {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    line-height: 1;
+    display: flex; flex-wrap: wrap; gap: 2px;
+    margin-bottom: 10px;
+  }
+  .char-box {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 28px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: background .12s, border-color .12s, transform .1s;
+    position: relative;
+    cursor: default;
+  }
+  .char-box.match    { background: rgba(167,139,250,0.25); border-color: var(--match); color: #c4b5fd; }
+  .char-box.active   { background: rgba(6,182,212,0.25);   border-color: var(--accent); transform: translateY(-3px); }
+  .char-box.compared { background: rgba(248,113,113,0.15); border-color: rgba(248,113,113,0.4); }
+  .char-box.normal   { background: var(--surface2); border-color: var(--border); color: var(--muted); }
+
+  /* occurrence map */
+  .occ-map {
+    height: 12px; border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    position: relative; overflow: hidden; margin-top: 10px;
+  }
+  .occ-tick {
+    position: absolute; top: 0; width: 3px; height: 100%;
+    background: var(--match); border-radius: 1px;
+    transition: opacity .3s;
+  }
+
+  /* ── METRICS GRID ── */
+  .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: border-color .2s;
+  }
+  .metric-card:hover { border-color: var(--accent); }
+  .metric-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .metric-val { font-size: 28px; font-weight: 800; font-family: 'Space Mono', monospace; }
+  .metric-sub { font-size: 11px; color: var(--muted); }
+
+  /* ── COMPARISON TABLE ── */
+  .comp-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px;
+  }
+  .comp-table th {
+    padding: 10px 16px; text-align: left;
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    color: var(--muted); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .comp-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    font-family: 'Space Mono', monospace; font-size: 12px;
+  }
+  .comp-table tr:last-child td { border-bottom: none; }
+  .comp-table tr { transition: background .15s; }
+  .comp-table tr:hover td { background: rgba(6,182,212,0.04); }
+  .winner-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    background: rgba(16,185,129,0.15); color: #34d399;
+    border: 1px solid rgba(16,185,129,0.3);
+  }
+
+  /* ── RECOMMENDATION ── */
+  .rec-card {
+    background: linear-gradient(135deg, rgba(6,182,212,0.08), rgba(6,182,212,0.02));
+    border: 1px solid rgba(6,182,212,0.3);
+    border-radius: 14px; padding: 22px 24px;
+    display: flex; gap: 20px; align-items: flex-start;
+  }
+  .rec-icon {
+    width: 52px; height: 52px; flex-shrink: 0;
+    background: rgba(6,182,212,0.15);
+    border: 1px solid rgba(6,182,212,0.3);
+    border-radius: 12px;
+    display: grid; place-items: center;
+    font-size: 24px;
+  }
+  .rec-body h3 { font-size: 16px; font-weight: 800; color: var(--accent); margin-bottom: 6px; }
+  .rec-body p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  /* ── CHART BAR ── */
+  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .bar-name { width: 110px; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 22px; background: var(--surface2); border-radius: 4px; overflow: hidden; position: relative; }
+  .bar-fill  { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(.23,1,.32,1); display: flex; align-items: center; padding-left: 8px; }
+  .bar-val   { font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.85); white-space: nowrap; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; padding: 80px 20px; text-align: center;
+    opacity: 0.4;
+  }
+  .empty-state .big-icon { font-size: 56px; }
+  .empty-state p { font-size: 15px; color: var(--muted); }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab-btn {
+    padding: 8px 18px; border-radius: 8px;
+    background: transparent; border: 1px solid transparent;
+    color: var(--muted); font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: all .15s;
+  }
+  .tab-btn.active { background: var(--surface2); border-color: var(--border); color: var(--text); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── STEP COUNTER ── */
+  .step-counter {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px; color: var(--muted);
+    margin-left: auto;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* animations */
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  .fade-in { animation: fadeIn 0.35s ease both; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .pulse { animation: pulse 1.2s ease infinite; }
+
+  /* responsive */
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">PM</div>
+  <div>
+    <h1>Pattern Matching <span>Suite</span></h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">4 algorithms · live comparison · visual analysis</div>
+  </div>
+  <div class="header-tags">
+    <span class="tag tag-naive">Naive</span>
+    <span class="tag tag-kmp">KMP</span>
+    <span class="tag tag-rk">Rabin-Karp</span>
+    <span class="tag tag-bm">Boyer-Moore</span>
+  </div>
+</header>
+
+<div class="app">
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div>
+      <div class="section-label">Text Input</div>
+      <textarea id="textInput" placeholder="Enter or paste text to search in...">The quick brown fox jumps over the lazy dog. Pattern matching is fundamental in computer science. The KMP algorithm avoids redundant comparisons. Boyer-Moore is fastest in practice for long patterns. Rabin-Karp uses rolling hashes for efficiency.</textarea>
+      <div class="preset-btns">
+        <button class="preset-btn" onclick="loadPreset('natural')">📝 Natural</button>
+        <button class="preset-btn" onclick="loadPreset('dna')">🧬 DNA</button>
+        <button class="preset-btn" onclick="loadPreset('repetitive')">🔁 Repetitive</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Pattern</div>
+      <input type="text" id="patternInput" placeholder="Enter pattern to find..." value="pattern">
+    </div>
+
+    <div>
+      <div class="section-label">Algorithms</div>
+      <div class="algo-toggles">
+        <label class="algo-toggle active" id="toggle-naive">
+          <input type="checkbox" checked onchange="toggleAlgo('naive', this)">
+          <div class="dot" style="background:var(--naive)"></div>
+          <span style="color:var(--naive)">Naive</span>
+        </label>
+        <label class="algo-toggle active" id="toggle-kmp">
+          <input type="checkbox" checked onchange="toggleAlgo('kmp', this)">
+          <div class="dot" style="background:var(--kmp)"></div>
+          <span style="color:var(--kmp)">KMP</span>
+        </label>
+        <label class="algo-toggle active" id="toggle-rk">
+          <input type="checkbox" checked onchange="toggleAlgo('rk', this)">
+          <div class="dot" style="background:var(--rk)"></div>
+          <span style="color:var(--rk)">Rabin-Karp</span>
+        </label>
+        <label class="algo-toggle active" id="toggle-bm">
+          <input type="checkbox" checked onchange="toggleAlgo('bm', this)">
+          <div class="dot" style="background:var(--bm)"></div>
+          <span style="color:var(--bm)">Boyer-Moore</span>
+        </label>
+      </div>
+    </div>
+
+    <button class="run-btn" onclick="runSearch()">▶ Run Search</button>
+
+    <div id="sidebar-stats" style="display:none">
+      <div class="section-label">Quick Stats</div>
+      <div id="quick-stats" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);line-height:2;"></div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <div id="empty-state" class="empty-state">
+      <div class="big-icon">🔍</div>
+      <p>Enter text and a pattern, then click <strong style="color:var(--text)">Run Search</strong><br>to see all four algorithms in action.</p>
+    </div>
+
+    <div id="results" style="display:none">
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('visualizer')">Visualizer</button>
+        <button class="tab-btn" onclick="showTab('comparison')">Comparison</button>
+        <button class="tab-btn" onclick="showTab('chart')">Chart</button>
+        <button class="tab-btn" onclick="showTab('recommend')">Recommendation</button>
+      </div>
+
+      <!-- TAB: VISUALIZER -->
+      <div id="tab-visualizer" class="tab-content active">
+        <div id="viz-container" style="display:flex;flex-direction:column;gap:16px;"></div>
+      </div>
+
+      <!-- TAB: COMPARISON -->
+      <div id="tab-comparison" class="tab-content">
+        <div class="metrics-grid" id="metrics-grid" style="margin-bottom:20px;"></div>
+        <div class="viz-card">
+          <div class="viz-card-header">
+            <span style="font-weight:800;font-size:14px;">Side-by-Side Comparison</span>
+          </div>
+          <div class="viz-body">
+            <table class="comp-table" id="comp-table">
+              <thead>
+                <tr>
+                  <th>Algorithm</th>
+                  <th>Matches Found</th>
+                  <th>Comparisons</th>
+                  <th>Time (ms)</th>
+                  <th>Extra Memory</th>
+                  <th>Best For</th>
+                </tr>
+              </thead>
+              <tbody id="comp-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: CHART -->
+      <div id="tab-chart" class="tab-content">
+        <div class="viz-card">
+          <div class="viz-card-header">
+            <span style="font-weight:800;font-size:14px;">Comparisons Made</span>
+            <span style="font-size:12px;color:var(--muted);margin-left:8px;">lower is better</span>
+          </div>
+          <div class="viz-body" id="chart-comparisons"></div>
+        </div>
+        <div class="viz-card" style="margin-top:16px;">
+          <div class="viz-card-header">
+            <span style="font-weight:800;font-size:14px;">Execution Time (ms)</span>
+            <span style="font-size:12px;color:var(--muted);margin-left:8px;">lower is better</span>
+          </div>
+          <div class="viz-body" id="chart-time"></div>
+        </div>
+      </div>
+
+      <!-- TAB: RECOMMENDATION -->
+      <div id="tab-recommend" class="tab-content">
+        <div id="rec-content"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  ALGORITHM IMPLEMENTATIONS
+// ─────────────────────────────────────────────
+
+function naiveSearch(text, pattern) {
+  const n = text.length, m = pattern.length;
+  const occurrences = [];
+  let comparisons = 0;
+  const t0 = performance.now();
+  for (let i = 0; i <= n - m; i++) {
+    let j;
+    for (j = 0; j < m; j++) { comparisons++; if (text[i+j] !== pattern[j]) break; }
+    if (j === m) occurrences.push(i);
+  }
+  return { name:'Naive', color:'var(--naive)', comparisons, timeMs: performance.now()-t0, occurrences, memBytes: 0, bestFor: 'Short patterns' };
+}
+
+function kmpSearch(text, pattern) {
+  const n = text.length, m = pattern.length;
+  let comparisons = 0;
+  const t0 = performance.now();
+  // build LPS
+  const lps = new Array(m).fill(0);
+  let len = 0, i = 1;
+  while (i < m) {
+    comparisons++;
+    if (pattern[i] === pattern[len]) { lps[i++] = ++len; }
+    else { if (len) len = lps[len-1]; else lps[i++] = 0; }
+  }
+  const occurrences = [];
+  let ti = 0, pi = 0;
+  while (ti < n) {
+    comparisons++;
+    if (text[ti] === pattern[pi]) { ti++; pi++; if (pi === m) { occurrences.push(ti-pi); pi = lps[pi-1]; } }
+    else { if (pi) pi = lps[pi-1]; else ti++; }
+  }
+  return { name:'KMP', color:'var(--kmp)', comparisons, timeMs: performance.now()-t0, occurrences, memBytes: m*4, bestFor: 'Repetitive / DNA text' };
+}
+
+function rabinKarpSearch(text, pattern) {
+  const n = text.length, m = pattern.length;
+  const BASE = 256, PRIME = 101;
+  let comparisons = 0;
+  const t0 = performance.now();
+  let patHash = 0, winHash = 0, highPow = 1;
+  for (let i = 0; i < m-1; i++) highPow = (highPow * BASE) % PRIME;
+  for (let i = 0; i < m; i++) {
+    patHash = (BASE * patHash + pattern.charCodeAt(i)) % PRIME;
+    winHash = (BASE * winHash + text.charCodeAt(i))    % PRIME;
+  }
+  const occurrences = [];
+  for (let i = 0; i <= n - m; i++) {
+    if (patHash === winHash) {
+      let j;
+      for (j = 0; j < m; j++) { comparisons++; if (text[i+j] !== pattern[j]) break; }
+      if (j === m) occurrences.push(i);
+    }
+    if (i < n - m) {
+      winHash = (BASE * (winHash - text.charCodeAt(i) * highPow) + text.charCodeAt(i+m)) % PRIME;
+      if (winHash < 0) winHash += PRIME;
+    }
+  }
+  return { name:'Rabin-Karp', color:'var(--rk)', comparisons, timeMs: performance.now()-t0, occurrences, memBytes: 16, bestFor: 'Multiple patterns' };
+}
+
+function boyerMooreSearch(text, pattern) {
+  const n = text.length, m = pattern.length;
+  const badChar = new Array(256).fill(-1);
+  for (let i = 0; i < m; i++) badChar[pattern.charCodeAt(i)] = i;
+  let comparisons = 0;
+  const t0 = performance.now();
+  const occurrences = [];
+  let shift = 0;
+  while (shift <= n - m) {
+    let j = m - 1;
+    while (j >= 0) { comparisons++; if (pattern[j] === text[shift+j]) j--; else break; }
+    if (j < 0) {
+      occurrences.push(shift);
+      shift += (shift+m < n) ? m - badChar[text.charCodeAt(shift+m)] : 1;
+    } else {
+      const bc = badChar[text.charCodeAt(shift+j)];
+      shift += Math.max(1, j - bc);
+    }
+  }
+  return { name:'Boyer-Moore', color:'var(--bm)', comparisons, timeMs: performance.now()-t0, occurrences, memBytes: 256*4, bestFor: 'Long patterns, natural text' };
+}
+
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+const activeAlgos = { naive: true, kmp: true, rk: true, bm: true };
+const algoFns = { naive: naiveSearch, kmp: kmpSearch, rk: rabinKarpSearch, bm: boyerMooreSearch };
+let lastResults = [];
+
+function toggleAlgo(key, cb) {
+  activeAlgos[key] = cb.checked;
+  document.getElementById('toggle-'+key).classList.toggle('active', cb.checked);
+}
+
+// ─────────────────────────────────────────────
+//  PRESETS
+// ─────────────────────────────────────────────
+const presets = {
+  natural: {
+    text: "The quick brown fox jumps over the lazy dog. Pattern matching is fundamental in computer science. The KMP algorithm avoids redundant comparisons by precomputing a failure function. Boyer-Moore is the fastest algorithm in practice for long patterns. Rabin-Karp uses rolling hashes for efficient window comparison.",
+    pattern: "pattern"
+  },
+  dna: {
+    text: "ACGTACGTACGTACGTCGATCGATCGATAGATCGATCGATACGTACGTTTAGCTAGCTAGCTACGATCGATACGATCGATACGTACGTCGATCGATCGATACGTACGT",
+    pattern: "ACGT"
+  },
+  repetitive: {
+    text: "ABABCABABDABABCABABDABABCABABDABABCABABDABABCABABDABABCABABDABABCABABDABABCABABDABABCABABDABABCABABD",
+    pattern: "ABABCABABD"
+  }
+};
+
+function loadPreset(key) {
+  document.getElementById('textInput').value = presets[key].text;
+  document.getElementById('patternInput').value = presets[key].pattern;
+}
+
+// ─────────────────────────────────────────────
+//  MAIN SEARCH
+// ─────────────────────────────────────────────
+function runSearch() {
+  const text    = document.getElementById('textInput').value.trim();
+  const pattern = document.getElementById('patternInput').value.trim();
+  if (!text || !pattern) { alert('Please enter both text and pattern.'); return; }
+
+  lastResults = [];
+  for (const [key, fn] of Object.entries(algoFns)) {
+    if (activeAlgos[key]) lastResults.push(fn(text, pattern));
+  }
+
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('results').style.display = 'block';
+
+  renderVisualizer(text, pattern, lastResults);
+  renderComparison(lastResults);
+  renderChart(lastResults);
+  renderRecommendation(text, pattern, lastResults);
+  renderSidebarStats(lastResults);
+
+  // re-animate current tab
+  showTab(document.querySelector('.tab-btn.active').textContent.toLowerCase().replace(' ',''));
+}
+
+// ─────────────────────────────────────────────
+//  VISUALIZER
+// ─────────────────────────────────────────────
+function renderVisualizer(text, pattern, results) {
+  const container = document.getElementById('viz-container');
+  container.innerHTML = '';
+  const maxShow = 120; // truncate display for long texts
+
+  results.forEach((r, idx) => {
+    const card = document.createElement('div');
+    card.className = 'viz-card fade-in';
+    card.style.animationDelay = (idx * 0.08) + 's';
+
+    const matchSet = new Set(r.occurrences);
+
+    // build character highlight map
+    const highlighted = new Array(text.length).fill('normal');
+    for (const pos of r.occurrences) {
+      for (let k = 0; k < pattern.length && pos+k < text.length; k++) {
+        highlighted[pos+k] = 'match';
+      }
+    }
+
+    const displayText = text.length > maxShow ? text.slice(0, maxShow) : text;
+
+    let charsHtml = '';
+    for (let i = 0; i < displayText.length; i++) {
+      const cls = highlighted[i] === 'match' ? 'match' : 'normal';
+      const ch = displayText[i] === ' ' ? '·' : escHtml(displayText[i]);
+      charsHtml += `<div class="char-box ${cls}" title="pos:${i}">${ch}</div>`;
+    }
+    if (text.length > maxShow) {
+      charsHtml += `<div style="color:var(--muted);font-size:11px;padding:6px 4px;align-self:center">+${text.length-maxShow} more chars</div>`;
+    }
+
+    // occurrence map
+    const mapTicks = r.occurrences.map(p => {
+      const pct = (p / text.length * 100).toFixed(2);
+      return `<div class="occ-tick" style="left:${pct}%"></div>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="viz-card-header">
+        <div class="algo-badge" style="background:${r.color}22;color:${r.color};border:1px solid ${r.color}44">${r.name}</div>
+        <span style="font-size:12px;color:var(--muted)">${r.occurrences.length} match${r.occurrences.length!==1?'es':''}</span>
+        <span class="step-counter">${r.comparisons} comparisons · ${r.timeMs.toFixed(4)} ms</span>
+      </div>
+      <div class="viz-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'Space Mono',monospace">
+          <span style="background:rgba(167,139,250,0.2);border:1px solid var(--match);border-radius:3px;padding:1px 5px;color:#c4b5fd">■ match</span>
+          &nbsp;positions: ${r.occurrences.length > 0 ? r.occurrences.slice(0,10).join(', ')+(r.occurrences.length>10?'...':'') : 'none'}
+        </div>
+        <div class="text-strip">${charsHtml}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:4px">Occurrence Map</div>
+        <div class="occ-map">${mapTicks}</div>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  COMPARISON
+// ─────────────────────────────────────────────
+function renderComparison(results) {
+  // metrics
+  const grid = document.getElementById('metrics-grid');
+  grid.innerHTML = '';
+  if (!results.length) return;
+
+  const totalMatches = results[0].occurrences.length;
+  const minCmp  = Math.min(...results.map(r=>r.comparisons));
+  const minTime = Math.min(...results.map(r=>r.timeMs));
+  const fastest = results.find(r=>r.timeMs===minTime);
+
+  const metrics = [
+    { label:'Matches Found', val: totalMatches, sub:'across all algorithms', color:'var(--match)' },
+    { label:'Pattern Length', val: results[0] ? document.getElementById('patternInput').value.length : '-', sub:'characters', color:'var(--accent)' },
+    { label:'Text Length',    val: document.getElementById('textInput').value.trim().length, sub:'characters', color:'var(--muted)' },
+    { label:'Fastest',        val: fastest ? fastest.name.split(' ')[0] : '-', sub: fastest ? fastest.timeMs.toFixed(4)+' ms' : '', color: fastest ? fastest.color : 'var(--text)' },
+  ];
+
+  metrics.forEach((m, i) => {
+    const card = document.createElement('div');
+    card.className = 'metric-card fade-in';
+    card.style.animationDelay = (i*0.06)+'s';
+    card.innerHTML = `<div class="metric-label">${m.label}</div><div class="metric-val" style="color:${m.color}">${m.val}</div><div class="metric-sub">${m.sub}</div>`;
+    grid.appendChild(card);
+  });
+
+  // table
+  const tbody = document.getElementById('comp-tbody');
+  tbody.innerHTML = '';
+  results.forEach(r => {
+    const isFastest = r.timeMs === minTime;
+    const isFewest  = r.comparisons === minCmp;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span style="color:${r.color};font-weight:800">${r.name}</span></td>
+      <td>${r.occurrences.length}</td>
+      <td>${r.comparisons} ${isFewest ? '<span class="winner-badge">fewest</span>' : ''}</td>
+      <td>${r.timeMs.toFixed(4)} ${isFastest ? '<span class="winner-badge">fastest</span>' : ''}</td>
+      <td>${r.memBytes === 0 ? 'O(1)' : r.memBytes + ' B'}</td>
+      <td style="color:var(--muted)">${r.bestFor}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  CHART
+// ─────────────────────────────────────────────
+function renderChart(results) {
+  renderBarChart('chart-comparisons', results, 'comparisons', r => r.comparisons);
+  renderBarChart('chart-time', results, 'time', r => r.timeMs);
+}
+
+function renderBarChart(containerId, results, key, valueFn) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  const maxVal = Math.max(...results.map(valueFn), 0.001);
+  results.forEach(r => {
+    const val = valueFn(r);
+    const pct = (val / maxVal * 100).toFixed(1);
+    const row = document.createElement('div');
+    row.className = 'bar-row fade-in';
+    row.innerHTML = `
+      <div class="bar-name" style="color:${r.color}">${r.name}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:0%;background:${r.color}88;transition:width 0.8s cubic-bezier(.23,1,.32,1)">
+          <span class="bar-val">${key==='time' ? val.toFixed(4)+' ms' : val}</span>
+        </div>
+      </div>`;
+    el.appendChild(row);
+    // animate after paint
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      row.querySelector('.bar-fill').style.width = pct + '%';
+    }));
+  });
+}
+
+// ─────────────────────────────────────────────
+//  RECOMMENDATION
+// ─────────────────────────────────────────────
+function renderRecommendation(text, pattern, results) {
+  const el = document.getElementById('rec-content');
+  el.innerHTML = '';
+
+  const n = text.length, m = pattern.length;
+  const dnaCount = (text.substring(0,200).match(/[ACGT]/g)||[]).length;
+  const isDNA = dnaCount > Math.min(200,n) * 0.75;
+  const sample = text.substring(0,100);
+  const uniqueChars = new Set(sample).size;
+  const isRepetitive = uniqueChars < 10;
+
+  let rec, why, icon;
+  if (m <= 5) {
+    rec = 'Naive or KMP'; why = 'For very short patterns, the preprocessing overhead of KMP\'s LPS table and Boyer-Moore\'s bad-character table is more expensive than just scanning naively. Both Naive and KMP finish quickly on short patterns.'; icon = '⚡';
+  } else if (isDNA || isRepetitive) {
+    rec = 'KMP (Knuth-Morris-Pratt)'; why = 'Your text uses a small alphabet (DNA: only A/C/G/T) or is highly repetitive. Boyer-Moore\'s bad-character heuristic fails to skip many characters on small alphabets, degrading to O(nm). KMP guarantees O(n+m) regardless of input structure.'; icon = '🧬';
+  } else if (m >= 15) {
+    rec = 'Boyer-Moore'; why = 'Long patterns allow Boyer-Moore to make large character skips using the bad-character heuristic. In practice, it skips roughly m/2 characters per step, achieving sub-linear O(n/m) behavior on natural text with large alphabets.'; icon = '🚀';
+  } else {
+    rec = 'KMP or Boyer-Moore'; why = 'Your text is natural language with an average-length pattern. Both KMP and Boyer-Moore are efficient here. KMP is theoretically safer (guaranteed O(n+m)); Boyer-Moore is often faster in practice. Either is an excellent choice.'; icon = '🎯';
+  }
+
+  // properties
+  const props = [
+    { label:'Text Length', val: n + ' chars' },
+    { label:'Pattern Length', val: m + ' chars' },
+    { label:'DNA-like text', val: isDNA ? '✅ Yes' : '❌ No' },
+    { label:'Repetitive text', val: isRepetitive ? '✅ Yes' : '❌ No' },
+    { label:'Unique chars (sample)', val: uniqueChars },
+  ];
+
+  const card = document.createElement('div');
+  card.className = 'rec-card fade-in';
+  card.innerHTML = `
+    <div class="rec-icon">${icon}</div>
+    <div class="rec-body">
+      <h3>Recommended: ${rec}</h3>
+      <p>${why}</p>
+    </div>`;
+  el.appendChild(card);
+
+  // analysis grid
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:16px;';
+  props.forEach(p => {
+    const c = document.createElement('div');
+    c.className = 'metric-card fade-in';
+    c.innerHTML = `<div class="metric-label">${p.label}</div><div style="font-size:16px;font-weight:800;font-family:'Space Mono',monospace;color:var(--text)">${p.val}</div>`;
+    grid.appendChild(c);
+  });
+  el.appendChild(grid);
+
+  // all-algorithm big-O summary
+  const summaryData = [
+    { name:'Naive',       color:'var(--naive)', best:'O(n)',    worst:'O(nm)',   note:'No preprocessing' },
+    { name:'KMP',         color:'var(--kmp)',   best:'O(n+m)', worst:'O(n+m)',  note:'LPS table' },
+    { name:'Rabin-Karp',  color:'var(--rk)',    best:'O(n+m)', worst:'O(nm)',   note:'Rolling hash' },
+    { name:'Boyer-Moore', color:'var(--bm)',    best:'O(n/m)', worst:'O(nm)',   note:'Bad-char table' },
+  ];
+  const sumCard = document.createElement('div');
+  sumCard.className = 'viz-card fade-in';
+  sumCard.style.marginTop = '16px';
+  sumCard.innerHTML = `
+    <div class="viz-card-header"><span style="font-weight:800;font-size:14px">Complexity Reference</span></div>
+    <div class="viz-body">
+      <table class="comp-table">
+        <thead><tr><th>Algorithm</th><th>Best Time</th><th>Worst Time</th><th>Space</th><th>Note</th></tr></thead>
+        <tbody>
+          ${summaryData.map(d=>`<tr>
+            <td><span style="color:${d.color};font-weight:800">${d.name}</span></td>
+            <td>${d.best}</td><td>${d.worst}</td>
+            <td>${d.name==='Naive'?'O(1)':d.name==='KMP'?'O(m)':d.name==='Rabin-Karp'?'O(1)':'O(σ)'}</td>
+            <td style="color:var(--muted)">${d.note}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  el.appendChild(sumCard);
+}
+
+// ─────────────────────────────────────────────
+//  SIDEBAR STATS
+// ─────────────────────────────────────────────
+function renderSidebarStats(results) {
+  const el = document.getElementById('quick-stats');
+  const wrap = document.getElementById('sidebar-stats');
+  if (!results.length) { wrap.style.display='none'; return; }
+  wrap.style.display = 'block';
+  const minCmp = Math.min(...results.map(r=>r.comparisons));
+  el.innerHTML = results.map(r =>
+    `<div style="color:${r.color}">${r.name.padEnd(13,' ')}<span style="color:var(--text)">${r.occurrences.length} hits · ${r.comparisons} cmp ${r.comparisons===minCmp?'✓':''}</span></div>`
+  ).join('');
+}
+
+// ─────────────────────────────────────────────
+//  TABS
+// ─────────────────────────────────────────────
+function showTab(name) {
+  const tabMap = { 'visualizer':'visualizer', 'comparison':'comparison', 'chart':'chart', 'recommendation':'recommend' };
+  const id = tabMap[name] || name;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().toLowerCase().replace(' ','') === name.toLowerCase().replace(' ',''));
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-'+id));
+}
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Auto-run on page load with default values
+window.addEventListener('load', () => runSearch());
+</script>
+</body>
+</html>
